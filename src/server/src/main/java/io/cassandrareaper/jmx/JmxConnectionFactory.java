@@ -25,14 +25,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.codahale.metrics.MetricRegistry;
 import com.datastax.driver.core.policies.EC2MultiRegionAddressTranslator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
-import com.google.common.collect.Maps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,55 +135,8 @@ public class JmxConnectionFactory {
     this.localMode = localMode;
   }
 
-  private static final class HostConnectionCounters {
-    private final ConcurrentMap<String, AtomicInteger> successfulConnections = Maps.newConcurrentMap();
-
-    private final MetricRegistry metricRegistry;
-
-    HostConnectionCounters(MetricRegistry metricRegistry) {
-      this.metricRegistry = metricRegistry;
-    }
-
-    void incrementSuccessfulConnections(String host) {
-      try {
-        AtomicInteger successes = successfulConnections.putIfAbsent(host, new AtomicInteger(1));
-        if (null != successes && successes.get() <= 20) {
-          successes.incrementAndGet();
-        }
-        LOG.debug("Host {} has {} successfull connections", host, successes);
-        if (null != metricRegistry) {
-          metricRegistry
-              .counter(
-                  MetricRegistry.name(
-                      JmxConnectionFactory.class, "connections", host.replace('.', '-')))
-              .inc();
-        }
-      } catch (RuntimeException e) {
-        LOG.warn("Could not increment JMX successfull connections counter for host {}", host, e);
-      }
-    }
-
-    void decrementSuccessfulConnections(String host) {
-      try {
-        AtomicInteger successes = successfulConnections.putIfAbsent(host, new AtomicInteger(-1));
-        if (null != successes && successes.get() >= -5) {
-          successes.decrementAndGet();
-        }
-        LOG.debug("Host {} has {} successfull connections", host, successes);
-        if (null != metricRegistry) {
-          metricRegistry
-              .counter(
-                  MetricRegistry.name(
-                      JmxConnectionFactory.class, "connections", host.replace('.', '-')))
-              .dec();
-        }
-      } catch (RuntimeException e) {
-        LOG.warn("Could not decrement JMX successfull connections counter for host {}", host, e);
-      }
-    }
-
-    int getSuccessfulConnections(String host) {
-      return successfulConnections.getOrDefault(host, new AtomicInteger(0)).get();
-    }
+  public final HostConnectionCounters getHostConnectionCounters() {
+    return hostConnectionCounters;
   }
+
 }
